@@ -43,7 +43,7 @@ class UniformQuantizer:
         return q_indices, reconstructed, error
 
 
-def load_signal_from_csv(csv_path, pollutant_name="NO2", signal_column="value"):
+def load_signal_from_csv(csv_path, pollutant_name, signal_column="value"):
     df = pd.read_csv(csv_path)
 
     if "pollutant" not in df.columns:
@@ -83,14 +83,11 @@ def check_even_parity(codeword):
 
 
 def flip_bit(bitstring, index):
-    if index < 0 or index >= len(bitstring):
-        raise IndexError("Bit index out of range")
-
     flipped = "1" if bitstring[index] == "0" else "0"
     return bitstring[:index] + flipped + bitstring[index + 1:]
 
 
-def save_integrity_figure(pass_clean, pass_error, save_path):
+def save_integrity_figure(pass_clean, pass_error, save_path, pollutant_name):
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -101,7 +98,7 @@ def save_integrity_figure(pass_clean, pass_error, save_path):
     bars = plt.bar(labels, values)
     plt.ylim(0, 1.2)
     plt.ylabel("Integrity Check Result")
-    plt.title("Bit Integrity / Error Summary")
+    plt.title(f"Bit Integrity / Error Summary ({pollutant_name})")
     plt.yticks([0, 1], ["Fail", "Pass"])
     plt.grid(axis="y", linestyle="--", alpha=0.6)
 
@@ -115,45 +112,39 @@ def save_integrity_figure(pass_clean, pass_error, save_path):
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=300)
-    plt.show()
+    plt.close()
 
 
 if __name__ == "__main__":
     csv_path = "data/processed/turdata_psd_ready.csv"
-    pollutant_name = "NO2"
     signal_column = "value"
+    pollutants = ["NO2", "O3", "PM10", "PM2_5"]
     bits = 8
 
-    signal, df = load_signal_from_csv(
-        csv_path=csv_path,
-        pollutant_name=pollutant_name,
-        signal_column=signal_column
-    )
+    for pollutant_name in pollutants:
+        try:
+            signal, df = load_signal_from_csv(
+                csv_path=csv_path,
+                pollutant_name=pollutant_name,
+                signal_column=signal_column
+            )
 
-    quantizer = UniformQuantizer(bits=bits)
-    quantized_indices, reconstructed_signal, quantization_error = quantizer.quantize(signal)
+            quantizer = UniformQuantizer(bits=bits)
+            quantized_indices, reconstructed_signal, quantization_error = quantizer.quantize(signal)
 
-    pcm_words, bitstream = pcm_encode_indices(quantized_indices, bits=bits)
+            pcm_words, bitstream = pcm_encode_indices(quantized_indices, bits=bits)
 
-    # Use first PCM word as a simple integrity example
-    data_bits = pcm_words[0]
-    codeword, parity_bit = add_even_parity(data_bits)
+            data_bits = pcm_words[0]
+            codeword, parity_bit = add_even_parity(data_bits)
+            clean_pass = check_even_parity(codeword)
 
-    clean_pass = check_even_parity(codeword)
+            error_codeword = flip_bit(codeword, 2)
+            error_pass = check_even_parity(error_codeword)
 
-    # Simulate one bit error
-    error_codeword = flip_bit(codeword, 2)
-    error_pass = check_even_parity(error_codeword)
+            figure_path = f"results/figures/fig_digital_bit_integrity_summary_{pollutant_name}.png"
+            save_integrity_figure(clean_pass, error_pass, figure_path, pollutant_name)
 
-    print("\n--- Bit Integrity Check Summary ---")
-    print(f"Original data bits       : {data_bits}")
-    print(f"Parity bit added         : {parity_bit}")
-    print(f"Transmitted codeword     : {codeword}")
-    print(f"Clean transmission check : {'PASS' if clean_pass else 'FAIL'}")
-    print(f"Corrupted codeword       : {error_codeword}")
-    print(f"Error transmission check : {'PASS' if error_pass else 'FAIL'}")
+            print(f"{pollutant_name}: integrity figure saved to {figure_path}")
 
-    figure_path = "results/figures/fig_digital_bit_integrity_summary.png"
-    save_integrity_figure(clean_pass, error_pass, figure_path)
-
-    print(f"\nFigure saved to: {figure_path}")
+        except Exception as e:
+            print(f"{pollutant_name}: skipped -> {e}")

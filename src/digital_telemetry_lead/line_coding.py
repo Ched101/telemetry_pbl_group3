@@ -43,7 +43,7 @@ class UniformQuantizer:
         return q_indices, reconstructed, error
 
 
-def load_signal_from_csv(csv_path, pollutant_name="NO2", signal_column="value"):
+def load_signal_from_csv(csv_path, pollutant_name, signal_column="value"):
     df = pd.read_csv(csv_path)
 
     if "pollutant" not in df.columns:
@@ -72,18 +72,10 @@ def pcm_encode_indices(indices, bits=8):
 
 
 def nrz_encode(bitstream):
-    """
-    NRZ-L encoding:
-    1 -> +1
-    0 -> -1
-    """
     return np.array([1 if bit == "1" else -1 for bit in bitstream], dtype=int)
 
 
-def save_line_coding_figure(bitstream, encoded_signal, save_path, n_bits=32):
-    """
-    Save Figure 18: Line Coding Waveform
-    """
+def save_line_coding_figure(bitstream, encoded_signal, save_path, pollutant_name, n_bits=32):
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -98,7 +90,7 @@ def save_line_coding_figure(bitstream, encoded_signal, save_path, n_bits=32):
     plt.ylim(-1.5, 1.5)
     plt.xlabel("Bit Index")
     plt.ylabel("Amplitude")
-    plt.title("NRZ Line Coding Waveform")
+    plt.title(f"NRZ Line Coding Waveform ({pollutant_name})")
     plt.grid(True)
 
     for i, bit in enumerate(bits_to_plot):
@@ -106,33 +98,39 @@ def save_line_coding_figure(bitstream, encoded_signal, save_path, n_bits=32):
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=300)
-    plt.show()
+    plt.close()
 
 
 if __name__ == "__main__":
     csv_path = "data/processed/turdata_psd_ready.csv"
-    pollutant_name = "NO2"
     signal_column = "value"
+    pollutants = ["NO2", "O3", "PM10", "PM2_5"]
     bits = 8
 
-    signal, df = load_signal_from_csv(
-        csv_path=csv_path,
-        pollutant_name=pollutant_name,
-        signal_column=signal_column
-    )
+    for pollutant_name in pollutants:
+        try:
+            signal, df = load_signal_from_csv(
+                csv_path=csv_path,
+                pollutant_name=pollutant_name,
+                signal_column=signal_column
+            )
 
-    quantizer = UniformQuantizer(bits=bits)
-    quantized_indices, reconstructed_signal, quantization_error = quantizer.quantize(signal)
+            quantizer = UniformQuantizer(bits=bits)
+            quantized_indices, reconstructed_signal, quantization_error = quantizer.quantize(signal)
 
-    pcm_words, bitstream = pcm_encode_indices(quantized_indices, bits=bits)
+            pcm_words, bitstream = pcm_encode_indices(quantized_indices, bits=bits)
+            encoded_signal = nrz_encode(bitstream)
 
-    encoded_signal = nrz_encode(bitstream)
+            figure_path = f"results/figures/fig_digital_line_coding_{pollutant_name}.png"
+            save_line_coding_figure(
+                bitstream,
+                encoded_signal,
+                figure_path,
+                pollutant_name=pollutant_name,
+                n_bits=32
+            )
 
-    print("\n--- Line Coding Summary ---")
-    print(f"First 32 bits       : {bitstream[:32]}")
-    print(f"Encoded amplitudes  : {encoded_signal[:32]}")
+            print(f"{pollutant_name}: line coding figure saved to {figure_path}")
 
-    figure_path = "results/figures/fig_digital_line_coding.png"
-    save_line_coding_figure(bitstream, encoded_signal, figure_path, n_bits=32)
-
-    print(f"\nFigure saved to: {figure_path}")
+        except Exception as e:
+            print(f"{pollutant_name}: skipped -> {e}")

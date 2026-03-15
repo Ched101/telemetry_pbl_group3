@@ -5,14 +5,9 @@ from pathlib import Path
 
 
 class UniformQuantizer:
-    """
-    Uniform quantizer for telemetry signals.
-    """
-
     def __init__(self, bits=8, x_min=None, x_max=None):
         if bits <= 0:
             raise ValueError("bits must be a positive integer")
-
         self.bits = bits
         self.levels = 2 ** bits
         self.x_min = x_min
@@ -48,10 +43,7 @@ class UniformQuantizer:
         return q_indices, reconstructed, error
 
 
-def load_signal_from_csv(csv_path, pollutant_name="NO2", signal_column="value"):
-    """
-    Load one pollutant signal from CSV.
-    """
+def load_signal_from_csv(csv_path, pollutant_name, signal_column="value"):
     df = pd.read_csv(csv_path)
 
     if "pollutant" not in df.columns:
@@ -74,28 +66,12 @@ def load_signal_from_csv(csv_path, pollutant_name="NO2", signal_column="value"):
 
 
 def pcm_encode_indices(indices, bits=8):
-    """
-    Convert quantized indices into fixed-length PCM binary words.
-    """
     pcm_words = [format(int(idx), f"0{bits}b") for idx in indices]
     bitstream = "".join(pcm_words)
     return pcm_words, bitstream
 
 
-def print_pcm_summary(original_signal, quantized_indices, pcm_words, n_show=10):
-    """
-    Print a few sample values with their quantized indices and PCM words.
-    """
-    print("\n--- PCM Encoding Summary ---")
-    print("Sample\tOriginal Value\tQuantized Index\tPCM Word")
-    for i in range(min(n_show, len(original_signal))):
-        print(f"{i}\t{original_signal[i]:.4f}\t\t{quantized_indices[i]}\t\t{pcm_words[i]}")
-
-
-def save_pcm_encoding_figure(original_signal, quantized_indices, pcm_words, save_path, n_show=10):
-    """
-    Save Figure 17: PCM Encoding Example
-    """
+def save_pcm_encoding_figure(original_signal, quantized_indices, pcm_words, save_path, pollutant_name, n_show=10):
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -122,60 +98,42 @@ def save_pcm_encoding_figure(original_signal, quantized_indices, pcm_words, save
     table.set_fontsize(10)
     table.scale(1, 1.5)
 
-    plt.title("PCM Encoding Example, NO2 (8-bit Quantization)", pad=20)
+    plt.title(f"PCM Encoding Example ({pollutant_name})", pad=20)
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
-    plt.show()
+    plt.close()
 
 
 if __name__ == "__main__":
-    # ==============================
-    # EDIT ONLY IF NEEDED
-    # ==============================
     csv_path = "data/processed/turdata_psd_ready.csv"
-    pollutant_name = "NO2"
     signal_column = "value"
+    pollutants = ["NO2", "O3", "PM10", "PM2_5"]
     bits = 8
 
-    # ==============================
-    # LOAD SIGNAL
-    # ==============================
-    signal, df = load_signal_from_csv(
-        csv_path=csv_path,
-        pollutant_name=pollutant_name,
-        signal_column=signal_column
-    )
+    for pollutant_name in pollutants:
+        try:
+            signal, df = load_signal_from_csv(
+                csv_path=csv_path,
+                pollutant_name=pollutant_name,
+                signal_column=signal_column
+            )
 
-    # ==============================
-    # QUANTIZE SIGNAL
-    # ==============================
-    quantizer = UniformQuantizer(bits=bits)
-    quantized_indices, reconstructed_signal, quantization_error = quantizer.quantize(signal)
+            quantizer = UniformQuantizer(bits=bits)
+            quantized_indices, reconstructed_signal, quantization_error = quantizer.quantize(signal)
 
-    # ==============================
-    # PCM ENCODE
-    # ==============================
-    pcm_words, bitstream = pcm_encode_indices(quantized_indices, bits=bits)
+            pcm_words, bitstream = pcm_encode_indices(quantized_indices, bits=bits)
 
-    # ==============================
-    # PRINT SUMMARY
-    # ==============================
-    print_pcm_summary(signal, quantized_indices, pcm_words, n_show=10)
+            figure_path = f"results/figures/fig_digital_pcm_encoding_example_{pollutant_name}.png"
+            save_pcm_encoding_figure(
+                signal,
+                quantized_indices,
+                pcm_words,
+                figure_path,
+                pollutant_name=pollutant_name,
+                n_show=10
+            )
 
-    print(f"\nBits per sample : {bits}")
-    print(f"Total samples   : {len(signal)}")
-    print(f"Total bitstream length : {len(bitstream)} bits")
+            print(f"{pollutant_name}: PCM figure saved to {figure_path}")
 
-    # ==============================
-    # SAVE FIGURE 17
-    # ==============================
-    figure_path = "results/figures/fig_digital_pcm_encoding_example.png"
-    save_pcm_encoding_figure(
-        signal,
-        quantized_indices,
-        pcm_words,
-        figure_path,
-        n_show=10
-    )
-
-    print(f"\nFigure saved to: {figure_path}")
+        except Exception as e:
+            print(f"{pollutant_name}: skipped -> {e}")

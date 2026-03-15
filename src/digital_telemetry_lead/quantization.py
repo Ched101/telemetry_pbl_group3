@@ -5,10 +5,6 @@ from pathlib import Path
 
 
 class UniformQuantizer:
-    """
-    Uniform quantizer for environmental telemetry signals.
-    """
-
     def __init__(self, bits=8, x_min=None, x_max=None):
         if bits <= 0:
             raise ValueError("bits must be a positive integer")
@@ -47,52 +43,36 @@ class UniformQuantizer:
 
         return q_indices, reconstructed, error
 
-    def print_summary(self, signal, q_indices, reconstructed, error):
-        print("\n--- Quantization Summary ---")
-        print(f"Bits              : {self.bits}")
-        print(f"Levels            : {self.levels}")
-        print(f"x_min             : {self.x_min:.4f}")
-        print(f"x_max             : {self.x_max:.4f}")
-        print(f"Step size (delta) : {self.delta:.6f}")
-        print(f"Signal length     : {len(signal)}")
-        print(f"Mean Abs Error    : {np.mean(np.abs(error)):.6f}")
-        print(f"Mean Sq Error     : {np.mean(error ** 2):.6f}")
 
-        print("\nFirst 10 samples:")
-        print("Original\tIndex\tReconstructed\tError")
-        for i in range(min(10, len(signal))):
-            print(
-                f"{signal[i]:.4f}\t{q_indices[i]}\t{reconstructed[i]:.4f}\t\t{error[i]:.4f}"
-            )
-
-
-def load_signal_from_csv(csv_path, signal_column):
-    """
-    Load one signal column from a CSV file.
-    """
+def load_signal_from_csv(csv_path, pollutant_name, signal_column="value"):
     df = pd.read_csv(csv_path)
-    df = df[df["pollutant"] == "NO2"]
-    signal = df[signal_column]
+
+    if "pollutant" not in df.columns:
+        raise ValueError("CSV must contain a 'pollutant' column")
 
     if signal_column not in df.columns:
         raise ValueError(
-            f"Column '{signal_column}' not found in CSV. Available columns: {list(df.columns)}"
+            f"Column '{signal_column}' not found. Available columns: {list(df.columns)}"
         )
 
-    signal = df[signal_column].dropna().to_numpy(dtype=float)
+    df = df[df["pollutant"] == pollutant_name].copy()
+    df = df.dropna(subset=[signal_column])
+
+    signal = df[signal_column].to_numpy(dtype=float)
+
+    if len(signal) == 0:
+        raise ValueError(f"No data found for pollutant '{pollutant_name}'")
+
     return signal, df
 
 
-def save_quantization_figure(original_signal, quantized_signal, save_path):
-    """
-    Save Figure 16: Original Signal vs Quantized Signal
-    """
+def save_quantization_figure(original_signal, quantized_signal, save_path, pollutant_name, n_samples=500):
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
 
-    plt.figure(figsize=(10, 5))
-    n_samples = 500
+    n_samples = min(n_samples, len(original_signal))
 
+    plt.figure(figsize=(10, 5))
     plt.plot(original_signal[:n_samples], label="Original Signal", linewidth=2)
     plt.step(
         np.arange(n_samples),
@@ -103,21 +83,17 @@ def save_quantization_figure(original_signal, quantized_signal, save_path):
     )
     plt.xlabel("Sample Index")
     plt.ylabel("Signal Value")
-    plt.title("Original Signal vs Quantized Signal (NO2)")
+    plt.title(f"Original vs Quantized Signal ({pollutant_name}, First {n_samples} Samples)")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(save_path, dpi=300)
-    plt.show()
+    plt.close()
 
 
 def quantize_signal(signal, bits=8, x_min=None, x_max=None):
-    """
-    Quantize a signal and return all useful outputs.
-    """
     quantizer = UniformQuantizer(bits=bits, x_min=x_min, x_max=x_max)
     q_indices, reconstructed, error = quantizer.quantize(signal)
-    quantizer.print_summary(signal, q_indices, reconstructed, error)
 
     return {
         "original_signal": np.asarray(signal, dtype=float),
@@ -133,40 +109,31 @@ def quantize_signal(signal, bits=8, x_min=None, x_max=None):
 
 
 if __name__ == "__main__":
-    # ==============================
-    # EDIT THESE TWO LINES ONLY
-    # ==============================
     csv_path = "data/processed/turdata_psd_ready.csv"
     signal_column = "value"
-
-    # Optional: use fixed telemetry range instead of automatic min/max
-    use_fixed_range = False
-    fixed_min = 0
-    fixed_max = 200
-
+    pollutants = ["NO2", "O3", "PM10", "PM2_5"]
     bits = 8
 
-    # ==============================
-    # LOAD SIGNAL
-    # ==============================
-    signal, df = load_signal_from_csv(csv_path, signal_column)
+    for pollutant_name in pollutants:
+        try:
+            signal, df = load_signal_from_csv(
+                csv_path=csv_path,
+                pollutant_name=pollutant_name,
+                signal_column=signal_column
+            )
 
-    # ==============================
-    # QUANTIZE SIGNAL
-    # ==============================
-    if use_fixed_range:
-        results = quantize_signal(signal, bits=bits, x_min=fixed_min, x_max=fixed_max)
-    else:
-        results = quantize_signal(signal, bits=bits)
+            results = quantize_signal(signal, bits=bits)
 
-    # ==============================
-    # SAVE FIGURE 16
-    # ==============================
-    figure_path = "results/figures/fig_digital_original_vs_quantized.png"
-    save_quantization_figure(
-        results["original_signal"],
-        results["reconstructed_signal"],
-        figure_path
-    )
+            figure_path = f"results/figures/fig_digital_original_vs_quantized_{pollutant_name}.png"
+            save_quantization_figure(
+                results["original_signal"],
+                results["reconstructed_signal"],
+                figure_path,
+                pollutant_name=pollutant_name,
+                n_samples=500
+            )
 
-    print(f"\nFigure saved to: {figure_path}")
+            print(f"{pollutant_name}: quantization figure saved to {figure_path}")
+
+        except Exception as e:
+            print(f"{pollutant_name}: skipped -> {e}")
