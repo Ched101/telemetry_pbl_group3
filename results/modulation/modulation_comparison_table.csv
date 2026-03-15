@@ -1,0 +1,6 @@
+scheme,category,mean_mse,mean_correlation,mean_recovered_snr_db,mean_ber
+AM,Analog,0.012707398087938337,0.9626682741762891,15.381366500659619,
+FM,Analog,0.6997073203042027,-0.0022947039769749453,-3.007632484274943,
+ASK,Digital,,,,0.0
+FSK,Digital,,,,0.0
+PSK,Digital,,,,0.0

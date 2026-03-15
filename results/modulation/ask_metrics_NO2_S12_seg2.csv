@@ -1,0 +1,2 @@
+scheme,pollutant,sensor_id,segment_id,ber,channel_snr_db,samples_per_bit,num_bits
+ASK,NO2,S12,2,0.0,15.0,20,1024

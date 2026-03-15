@@ -1,0 +1,2 @@
+scheme,pollutant,sensor_id,segment_id,mse,correlation,recovered_snr_db,channel_snr_db,carrier_hz,kf,fs_hz,num_samples
+FM,PM10,S10,2,0.7277725343549577,-0.0026041731814071684,-2.7179510763967873,20.0,0.1,0.05,1.0,5375

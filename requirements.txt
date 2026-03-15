@@ -1,8 +1,0 @@
-numpy
-scipy
-pandas
-matplotlib
-openpyxl
-jupyter
-black
-pylint
