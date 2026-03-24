@@ -1,11 +1,4 @@
 """
-run_monitoring.py — Student 5: Monitoring Lead
-
-Headless pipeline runner. Generates all four report figures and the alert log
-without launching a browser. Run from the project root:
-
-    python scripts/run_monitoring.py
-
 Outputs
 -------
   results/figures/fig_monitoring_feature_trends.png    (Figure 20)

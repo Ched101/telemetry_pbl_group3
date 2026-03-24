@@ -1,11 +1,3 @@
-"""
-run_dashboard.py — Student 5: Monitoring Lead
-
-Launches the Streamlit monitoring dashboard.
-
-Usage (from project root):
-    python scripts/run_dashboard.py
-"""
 
 import subprocess
 import sys

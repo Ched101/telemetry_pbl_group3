@@ -213,13 +213,13 @@ Example: run preprocessing
 python src/signal_processing_lead/preprocessing.py
 ````
 
-Example: run gap analysis
+Example: run monitoring.py
 ````bash
-python src/signal_processing_lead/gap_analysis.py
+python src/scripts/run_monitoring.py
 ````
 
-To run the whole telemetry pipeline
+To run the whole telemetry pipeline and view the dashboard
 ````bash
-python scripts/run_pipeline.py
+python scripts/run_dashboard.py
 ````
 
