@@ -83,22 +83,35 @@ telemetry_pbl_group3/
 │   └── logs/                 # Execution logs
 │
 ├── scripts/                  # Top-level runnable scripts for pipeline execution
-│
+│   ├── run_dashboard.py                             
+│   └── run_monitoring.py
+│   
 ├── src/
 │   ├── signal_processing_lead/
+|   |   ├── data_loader.py
+|   |   ├── export_modulation_ready_segments.py
 │   │   ├── preprocessing.py
+|   |   ├── preprocessing_report_outputs.py
 │   │   ├── gap_analysis.py
+|   |   ├── psd_analysis.py
+|   |   ├── psd_multi_sensor.py
+|   |   ├── psd_summary_table.py
 │   │   ├── prepare_psd_ready.py
-│   │   ├── filter_compare.py
-│   │   └── filter_metrics.py
+|   |   ├── sampling.py
+|   |   ├── segment_selection.py
+|   |   ├── sensor_selection.py
+│   │   ├── filtering_comparison.py
+│   │   └── filter_metrics_comparison.py
 │   │
 │   ├── modulation_lead/
 │   │   ├── am_modulation.py
 │   │   ├── fm_modulation.py
-│   │   ├── ask_modulation.py
-│   │   ├── fsk_modulation.py
-│   │   ├── psk_modulation.py
-│   │   └── channel_noise.py
+│   │   ├── digital_modulation.py
+│   │   ├── metrics.py
+│   │   ├── run_all_modulation.py
+|   |   ├── run_batch_analysis.py
+|   |   ├── summarise_results.py
+│   │   └── channel.py
 │   │
 │   ├── digital_telemetry_lead/
 │   │   ├── quantization.py
@@ -110,8 +123,8 @@ telemetry_pbl_group3/
 │   │   ├── feature_extraction.py
 │   │   ├── threshold_detection.py
 │   │   ├── drift_detection.py
-│   │   ├── alert_system.py
-│   │   └── dashboard_streamlit.py
+│   │   ├── alert_logger.py
+│   │   └── dashboard.py
 │   │
 │   └── system_architect/
 │       ├── pipeline_controller.py
@@ -147,7 +160,6 @@ Core libraries
 Development environment(s)
 
 - VS Code
-- Jupyter Notebook / JupyterLab
 - Git and GitHub for version control
 
 ---
