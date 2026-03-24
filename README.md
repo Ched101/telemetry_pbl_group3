@@ -124,18 +124,7 @@ telemetry_pbl_group3/
 │   │   ├── threshold_detection.py
 │   │   ├── drift_detection.py
 │   │   ├── alert_logger.py
-│   │   └── dashboard.py
-│   │
-│   └── system_architect/
-│       ├── pipeline_controller.py
-│       ├── integration_tests.py
-│       └── system_diagram.py
-│
-├── tests/                    # Additional test scripts and validation cases
-│   ├── test_preprocessing.py
-│   ├── test_modulation.py
-│   ├── test_telemetry_pipeline.py
-│   └── test_monitoring.py                             
+│   │   └── dashboard.py                         
 ├── requirements.txt          # Python dependencies
 └── README.md
 ````
