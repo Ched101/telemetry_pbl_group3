@@ -270,6 +270,138 @@ def render_modulation_quality(metrics_df: pd.DataFrame) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Tab: Event Scope
+# ---------------------------------------------------------------------------
+
+def render_event_scope(df_thresh: pd.DataFrame, df_feat: pd.DataFrame,
+                       pollutant: str) -> None:
+    st.subheader("Event Scope Analysis — Local vs City-Wide")
+    st.markdown(
+        "Determines whether a pollution event was seen by a **single sensor** (local) "
+        "or by **multiple sensors at once** (city-wide). "
+        "Events are grouped by segment — each segment is a continuous time window."
+    )
+
+    from matplotlib.patches import Patch
+
+    pollutant_sel = pollutant
+
+    df_p = df_thresh[df_thresh["pollutant"] == pollutant_sel].copy()
+    total_sensors = df_p["sensor_id"].nunique()
+
+    # --- Threshold-based scope ---
+    exceeded = df_p[df_p["threshold_level"].notna()]
+
+    scope = (
+        exceeded.groupby("segment_id")["sensor_id"]
+        .nunique()
+        .reset_index()
+        .rename(columns={"sensor_id": "sensors_exceeding"})
+    )
+    scope["total_sensors"] = total_sensors
+    scope["pct_sensors"] = (scope["sensors_exceeding"] / total_sensors * 100).round(1)
+
+    def classify(n, total):
+        if n == 1:
+            return "Local"
+        elif n / total < 0.5:
+            return "Partial"
+        else:
+            return "City-Wide"
+
+    scope["scope"] = scope.apply(
+        lambda r: classify(r["sensors_exceeding"], r["total_sensors"]), axis=1
+    )
+
+    # --- Spike-based scope ---
+    df_spikes = df_feat[df_feat["pollutant"] == pollutant_sel].copy()
+    spike_scope = (
+        df_spikes[df_spikes["spike_flag"]]
+        .groupby("segment_id")["sensor_id"]
+        .nunique()
+        .reset_index()
+        .rename(columns={"sensor_id": "sensors_spiking"})
+    )
+    scope = scope.merge(spike_scope, on="segment_id", how="left").fillna({"sensors_spiking": 0})
+    scope["sensors_spiking"] = scope["sensors_spiking"].astype(int)
+
+    # --- Summary metrics ---
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total sensors", total_sensors)
+    col2.metric("Segments with exceedances", len(scope))
+    col3.metric("Local events", int((scope["scope"] == "Local").sum()))
+    col4.metric("City-Wide events", int((scope["scope"] == "City-Wide").sum()))
+
+    # --- Bar chart ---
+    color_map = {"Local": "steelblue", "Partial": "darkorange", "City-Wide": "firebrick"}
+    bar_colors = [color_map[s] for s in scope["scope"]]
+
+    fig, ax = plt.subplots(figsize=(11, 4))
+    ax.bar(scope["segment_id"].astype(str), scope["sensors_exceeding"],
+           color=bar_colors, alpha=0.85, zorder=3)
+    citywide_threshold = total_sensors * 0.5
+    ax.axhline(citywide_threshold, color="firebrick", linestyle="--", linewidth=1.3,
+               label=f"City-Wide threshold (50% = {citywide_threshold:.0f} sensors)")
+    ax.set_xlabel("Segment ID")
+    ax.set_ylabel("Sensors with threshold exceedance")
+    ax.set_title(f"Event Scope per Segment — {pollutant_sel}")
+    ax.grid(True, axis="y", alpha=0.3, zorder=0)
+    legend_patches = [
+        Patch(facecolor="steelblue",  alpha=0.85, label="Local (1 sensor)"),
+        Patch(facecolor="darkorange", alpha=0.85, label="Partial (<50% of sensors)"),
+        Patch(facecolor="firebrick",  alpha=0.85, label="City-Wide (≥50% of sensors)"),
+    ]
+    ax.legend(handles=legend_patches, fontsize=8)
+    st.pyplot(fig)
+    plt.close(fig)
+
+    # --- Summary table ---
+    st.markdown("**Segment scope summary:**")
+    display_cols = ["segment_id", "sensors_exceeding", "sensors_spiking",
+                    "pct_sensors", "total_sensors", "scope"]
+    st.dataframe(
+        scope[display_cols].rename(columns={
+            "segment_id": "Segment",
+            "sensors_exceeding": "Sensors w/ exceedance",
+            "sensors_spiking": "Sensors w/ spikes",
+            "pct_sensors": "% of network",
+            "total_sensors": "Total sensors",
+            "scope": "Classification",
+        }),
+        use_container_width=True,
+    )
+
+    # --- Drill-down ---
+    st.markdown("---")
+    st.markdown("**Drill down — which sensors triggered in a specific segment?**")
+    seg_options = sorted(scope["segment_id"].unique())
+    if seg_options:
+        sel_seg = st.selectbox("Select Segment", seg_options, key="scope_seg")
+
+        thresh_detail = exceeded[exceeded["segment_id"] == sel_seg]
+        spike_detail  = df_spikes[
+            (df_spikes["segment_id"] == sel_seg) & (df_spikes["spike_flag"])
+        ]
+
+        all_sensors = sorted(df_p[df_p["segment_id"] == sel_seg]["sensor_id"].unique())
+        rows = []
+        for s in all_sensors:
+            warn_n  = int((thresh_detail[thresh_detail["sensor_id"] == s]["threshold_level"] == "warn").sum())
+            alert_n = int((thresh_detail[thresh_detail["sensor_id"] == s]["threshold_level"] == "alert").sum())
+            spike_n = int((spike_detail["sensor_id"] == s).sum())
+            triggered = warn_n + alert_n > 0 or spike_n > 0
+            rows.append({
+                "Sensor": s,
+                "Warn events": warn_n,
+                "Alert events": alert_n,
+                "Spike events": spike_n,
+                "Triggered": "Yes" if triggered else "No",
+            })
+        detail_df = pd.DataFrame(rows)
+        st.dataframe(detail_df, use_container_width=True)
+
+
+# ---------------------------------------------------------------------------
 # Main app
 # ---------------------------------------------------------------------------
 
@@ -281,7 +413,6 @@ def main() -> None:
     )
 
     st.title("🌍 Environmental Telemetry Monitoring System")
-    st.caption("TELE 523 PBL — Group 3 | Student 5: Monitoring Lead | TURDATA Prague Urban Air Quality")
 
     # Load data (cached)
     with st.spinner("Initialising monitoring pipeline..."):
@@ -311,12 +442,13 @@ def main() -> None:
     st.sidebar.metric("Drifting segments", int(df_drift["drift_flag"].sum()))
 
     # ---- Tabs ----
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "Signal Overview",
         "Threshold Monitoring",
         "Drift Analysis",
         "Alert Log",
         "Modulation Quality",
+        "Event Scope",
     ])
 
     with tab1:
@@ -333,6 +465,9 @@ def main() -> None:
 
     with tab5:
         render_modulation_quality(metrics_df)
+
+    with tab6:
+        render_event_scope(df_thresh, df_feat, pollutant)
 
 
 if __name__ == "__main__":
