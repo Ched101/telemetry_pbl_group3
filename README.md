@@ -21,10 +21,10 @@ The engineering goal is to demonstrate how telemetry principles can be applied t
 
 The system is designed around an **environmental monitoring use case**, with emphasis on pollutant-related signals such as:
 
-- PM
-- NO2
-- O3
-- SO2
+-NO2
+-O3
+-PM10 
+-PM2.5
 - drift behaviour
 - threshold exceedance events
 
