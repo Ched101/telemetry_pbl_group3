@@ -200,7 +200,7 @@ def render_drift_panel(df: pd.DataFrame, df_drift: pd.DataFrame,
     st.markdown("**All segments — drift summary:**")
     st.dataframe(
         df_drift[df_drift["pollutant"] == pollutant]
-        .style.applymap(lambda v: "background-color: #ffcccc" if v is True else "",
+        .style.map(lambda v: "background-color: #ffcccc" if v is True else "",
                         subset=["drift_flag"]),
         use_container_width=True,
     )
